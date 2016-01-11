@@ -45,11 +45,18 @@ show_version_add_exit()
     exit 0
 }
 
+show_file()
+{
+    printf 'ID   NAME  %10s %16s    INFOMATION\n' TYPE 'CREATE DATE'
+    awk -F '%' '{printf("%4s %5s %10s %16s    %s\n", $1, $2, $3, $4, $5)}' \
+        "$FILE_NAME"
+}
+
 # Result stores in $asked_type.
 ask_for_type()
 {
     export PS3='Choose the type of it:'
-    select asked_type in Project Code Game Music Document ;
+    select asked_type in Project Code Game Music Document;
     do
         break
     done
@@ -76,6 +83,7 @@ get_max_existed_id()
 # $*:   Info
 add_record_to_file()
 {
+    # Maybe someday prefixes will conflict, so set them manually.
     case $2 in
         Project ) prefix='P';;
         Code    ) prefix='C';;
@@ -87,7 +95,8 @@ add_record_to_file()
     r_type=$2
     shift 2
     output_string=$r_id'%'$prefix$r_id'%'$r_type'%'$(date '+%b %d, %Y')'%'$*
-    echo 'OUTPUT:' "$output_string"
+    # echo 'OUTPUT:' "$output_string"
+    echo $output_string >> "$FILE_NAME"
 }
 
 #Main program
@@ -100,16 +109,31 @@ case $1 in
     add )
         get_max_existed_id
         ask_for_type
-        echo 'Write something about it:'
+        printf 'Write something about it:'
         read info
         current_id=$(printf %04d $(($max_existed_id + 1)))
         [[ $(($current_id > 9999)) -gt 0 ]] && {
             echo 'c.5: ERROR - Id is too large.'
             exit 1
         }
+        printf 'ARE YOU SURE?(Yes for sure, other for quit)'
+        read yes
+        [[ $yes == Yes ]] || exit 0
         add_record_to_file $current_id $asked_type $info
-        echo 'Program finished successfully.'
+        # echo 'Program finished successfully.'
         exit 0;;
+    show )
+        [[ $2 == 'less' ]] && {
+            show_file | less
+            exit 0
+        }
+        [[ -z $2 ]] && {
+            show_file
+            exit 0
+        }
+        echo "Unknown value: $2."
+        echo 'Try "c.5 help" for more info.'
+        exit 1;;
     * )
         echo "Unknown command: $1"
         echo 'Try "c.5 help" for more info.'
