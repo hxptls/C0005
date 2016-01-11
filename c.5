@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# c.5
+# Created by Hexapetalous on Jan 12, 2016.
+#
+# This is a part of C0005, Hexapetalous' file manager.
+# This shell script tries to do something.
+#
+# Copyright (c) 2016 Hexapetalous. All rights reserved.
+# This code is licensed under MIT License.
+#
+VERSION='0'
+FILE_NAME='/home/wan/N_E_I_H version1.0/C0005/.save'
+
+show_help_and_exit()
+{
+    cat << HELP
+This is c.5 version $VERSION.
+
+Usage: c.5 [COMMAND] [OPTION_VALUE]
+c.5 manages the info of files, and allows you to add something to dataset.
+
+The followings are correct commands:
+    add                Create a new known-type objects.
+    backup             Backup the dataset.
+    edit id            Edit the info of object.
+    help               Show this help.
+    restore            Restore the dataset.
+    search [pattern]   Search a object by info.
+    show [less]        Show all the existed objects. If there are too many 
+                       objects, use "less" value to show it in less(1).
+    version            Show version.
+
+Here are known types:
+    Code Document Game Music Project
+
+Copyright (c) 2016 Hexapetalous. All rights reserved.
+HELP
+    exit 0
+}
+
+show_version_add_exit()
+{
+    echo $VERSION
+    exit 0
+}
+
+# Result stores in $asked_type.
+ask_for_type()
+{
+    export PS3='Choose the type of it:'
+    select asked_type in Project Code Game Music Document ;
+    do
+        break
+    done
+    return
+}
+
+# Result stores in $max_existed_id.
+get_max_existed_id()
+{
+    [[ -f $FILE_NAME ]] || {
+        touch "$FILE_NAME"
+        max_existed_id=-1
+        return
+    }
+    [[ -r $FILE_NAME ]] || {
+        echo "c.5: ERROR - Can not read data file."
+        exit 1
+    }
+    max_existed_id=$(cut --characters=1-4 "$FILE_NAME" | tail --lines=1)
+}
+
+# $1:   ID
+# $2:   Type
+# $*:   Info
+add_record_to_file()
+{
+    case $2 in
+        Project ) prefix='P';;
+        Code    ) prefix='C';;
+        Document) prefix='D';;
+        Game    ) prefix='G';;
+        Music   ) prefix='M';;
+    esac
+    r_id=$1
+    r_type=$2
+    shift 2
+    output_string=$r_id'%'$prefix$r_id'%'$r_type'%'$(date '+%b %d, %Y')'%'$*
+    echo 'OUTPUT:' "$output_string"
+}
+
+#Main program
+[[ -z "$1" ]] && show_help_and_exit
+case $1 in
+    help )
+        show_help_and_exit;;
+    version )
+        show_version_add_exit;;
+    add )
+        get_max_existed_id
+        ask_for_type
+        echo 'Write something about it:'
+        read info
+        current_id=$(printf %04d $(($max_existed_id + 1)))
+        [[ $(($current_id > 9999)) -gt 0 ]] && {
+            echo 'c.5: ERROR - Id is too large.'
+            exit 1
+        }
+        add_record_to_file $current_id $asked_type $info
+        echo 'Program finished successfully.'
+        exit 0;;
+    * )
+        echo "Unknown command: $1"
+        echo 'Try "c.5 help" for more info.'
+        exit 1;;
+esac
