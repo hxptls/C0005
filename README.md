@@ -1,4 +1,4 @@
-Hexapetalous's file manager.
+Hexapetalous' file manager.
 ================
 ####C0005####
 
