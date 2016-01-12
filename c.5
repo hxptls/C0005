@@ -39,9 +39,10 @@ HELP
     exit 0
 }
 
-show_version_add_exit()
+show_version_and_exit()
 {
-    echo $VERSION
+    echo "c.5 version $VERSION"
+    echo 'This program is licensed under MIT License.'
     exit 0
 }
 
@@ -52,35 +53,21 @@ show_file()
         "$FILE_NAME"
 }
 
-# Result stores in $asked_type.
+### ADD & EDIT SHARED PART #####################################################
 ask_for_type()
 {
-    export PS3='Choose the type of it:'
+    local $asked_type
+    export PS3='Choose the type of it: '
     select asked_type in Project Code Game Music Document;
     do
         break
     done
-    return
+    echo $asked_type
 }
 
-# Result stores in $max_existed_id.
-get_max_existed_id()
-{
-    [[ -f $FILE_NAME ]] || {
-        touch "$FILE_NAME"
-        max_existed_id=-1
-        return
-    }
-    [[ -r $FILE_NAME ]] || {
-        echo "c.5: ERROR - Can not read data file."
-        exit 1
-    }
-    max_existed_id=$(cut --characters=1-4 "$FILE_NAME" | tail --lines=1)
-}
-
-prefix=''
 set_prefix()
 {
+    local prefix
     # Maybe someday prefixes will conflict, so set them manually.
     case $1 in
         Project ) prefix='P';;
@@ -89,102 +76,106 @@ set_prefix()
         Game    ) prefix='G';;
         Music   ) prefix='M';;
     esac
+    echo $prefix
 }
 
-# $1: ID
-# $2: Type
-# $3 $4 $5: Date
-# $*: Info
+# $1 ID $2 Type $3 Date $4 Info
+create_a_record()
+{
+    echo $1'%'$(set_prefix $2)$1'%'$2'%'$3'%'$4
+}
+
+### ADD PART ###################################################################
+get_max_existed_id()
+{
+    [[ -f $FILE_NAME ]] || {
+        touch "$FILE_NAME"
+        echo -1
+    }
+    local raw_max=$(cut --characters=1-4 "$FILE_NAME" | tail --lines=1)
+    while [[ $(echo $raw_max | cut --characters=1) == '0' ]]; do
+        raw_max=$(echo $raw_max | cut --characters=2-)
+    done
+    echo $raw_max
+}
+
+# $1: ID $2: Type $3: Info
+add_record_to_file()
+{
+    echo $(create_a_record $1 $2 "$(date '+%b %d, %Y')" "$3") >> "$FILE_NAME"
+}
+
+### EDIT PART ##################################################################
+# $1: ID $2: Type $3: Date $4: Info
+# Type, date and info are old ones and may be changed.
 real_modify_file()
 {
-    c_id=$1
-    new_type=$2
-    echo 'Change type?(y or other):'
-    read var1
+    local new_type=$2
+    read -p 'Change type?(y or other): ' var1
     [[ $var1 == y ]] && {
-        export PS3='Choose the type of it:'
-        select re_new_type in Project Code Game Music Document;
-        do
-            break
-        done
-        new_type=$re_new_type
+        new_type=$(ask_for_type)
     }
-    new_time="$3 $4 $5"
-    printf 'Change time to now?(y or other):'
-    read var2
+    local new_time=$3
+    read -p 'Change time to now?(y or other): ' var2
     [[ $var2 == y ]] && new_time=$(date '+%b %d, %Y')
-    # new_time=$re_new_time
-    shift 5
-    new_info=$*
-    printf 'Change info?(y or other):'
-    read var3
-    [[ $var3 == y ]] && {
-        printf 'Write it down:'
-        read re_new_info
-        new_info=$re_new_info
+    local new_info=$4
+    read -p 'Change info?(y or other): ' var3
+    [[ $var3 == y ]] && { 
+        read -p 'Write it down: ' new_info2
+        new_info=$new_info2
     }
-    set_prefix $new_type
-    new_output_line=$c_id'%'$prefix$c_id'%'$new_type'%'$new_time'%'$new_info
-    sed -i "s/^$c_id/$new_output_line/g" "$FILE_NAME"
+    local modified_line=$(create_a_record $1 $new_type "$new_time" "$new_info")
+    sed -i "s/^$1/$modified_line/g" "$FILE_NAME"
 }
 
 # $1: ID
 modify_file()
 {
-    flag=0
+    [[ -f "$FILE_NAME" ]] || {
+        echo 'c.5: ERROR - Did not find data file.'
+        exit 1
+    }
     while read line; 
     do
         [[ $(echo $line | cut --characters=1-4) == $(printf "%04d" $1) ]] && {
-            flag=1
             break
         }
     done < "$FILE_NAME"
-    [[ flag == 0 ]] && {
+    [[ -z $line ]] && {
         echo 'c.5: ERROR - No found of ID:' $1
         exit 1
     }
-    var=$(echo $line | \
-            awk -F '%' '{printf("%s %s %s %s\n", $1, $3, $4, $5)}')
-    real_modify_file $var
+    local data date info
+    data=($(echo $line | awk -F '%' '{printf("%s %s %s %s", $1, $3, $4, $5)}'))
+    date="${data[2]} ${data[3]} ${data[4]}"
+    info=${data[@]:5}
+    real_modify_file ${data[0]} ${data[1]} "$date" "$info"
     return
 }
 
-# $1:   ID
-# $2:   Type
-# $*:   Info
-add_record_to_file()
-{
-    r_id=$1
-    r_type=$2
-    set_prefix $r_type
-    shift 2
-    output_string=$r_id'%'$prefix$r_id'%'$r_type'%'$(date '+%b %d, %Y')'%'$*
-    # echo 'OUTPUT:' "$output_string"
-    echo $output_string >> "$FILE_NAME"
-}
-
-#Main program
+### MAIN PROGRAM ###############################################################
 [[ -z "$1" ]] && show_help_and_exit
 case $1 in
     help )
         show_help_and_exit;;
     version )
-        show_version_add_exit;;
+        show_version_and_exit;;
     add )
-        get_max_existed_id
-        ask_for_type
-        printf 'Write something about it:'
-        read info
-        current_id=$(printf %04d $(($max_existed_id + 1)))
+        max_existed_id=$(get_max_existed_id)
+        asked_type=$(ask_for_type)
+        read -p 'Write something about it: ' info
+        current_id=$(($max_existed_id + 1))
+        # There are too many IDs already.
         [[ $(($current_id > 9999)) -gt 0 ]] && {
             echo 'c.5: ERROR - Id is too large.'
             exit 1
         }
-        printf 'ARE YOU SURE?(Yes for sure, other for quit)'
-        read yes
+        current_id=$(printf "%04d" $current_id)
+        # It should be thinking when adding a object.
+        read -p 'ARE YOU SURE?(Yes for sure, other for quit) ' yes
         [[ $yes == Yes ]] || exit 0
-        add_record_to_file $current_id $asked_type $info
-        # echo 'Program finished successfully.'
+        add_record_to_file $current_id $asked_type "$info"
+        echo 'Program finished successfully.'
         exit 0;;
     show )
         [[ $2 == 'less' ]] && {
@@ -204,7 +195,9 @@ case $1 in
             echo 'Try "c.5 help" for more info.'
             exit 1
         }
-        modify_file $2;;
+        modify_file $2
+        echo 'Program finished correctly.'
+        exit 0;;
     * )
         echo "Unknown command: $1"
         echo 'Try "c.5 help" for more info.'
