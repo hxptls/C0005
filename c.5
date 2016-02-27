@@ -10,7 +10,8 @@
 # This code is licensed under MIT License.
 #
 VERSION='0'
-FILE_NAME='/home/wan/N_E_I_H version1.0/C0005/.save'
+FILE_DIR='/home/wan/.C0005/'
+FILE_NAME=$FILE_DIR'save'
 
 show_help_and_exit()
 {
@@ -129,6 +130,10 @@ get_max_existed_id()
 # $1: ID $2: Type $3: Info
 add_record_to_file()
 {
+    [[ -f $FILE_NAME ]] || {
+    	mkdir -p $FILE_DIR
+    	touch $FILE_NAME
+    }
     echo $(create_a_record $1 $2 "$(date '+%b %d, %Y')" "$3") >> "$FILE_NAME"
 }
 
@@ -218,6 +223,7 @@ case $1 in
         read -p 'ARE YOU SURE?(Yes for sure, other for quit) ' yes
         [[ $yes == Yes ]] || exit 0
         add_record_to_file $current_id $asked_type "$info"
+        echo "The new object will be named as \"$(set_prefix $asked_type)$current_id\"."
         echo 'Program finished successfully.'
         exit 0;;
     show )
